@@ -6,7 +6,7 @@ local GreaterNum = {}
 local Fast = {}
 GreaterNum.Fast = Fast
 
-local VERSION = "1.4.1"
+local VERSION = "1.1.0"
 local SIZE = 17
 
 local S = 0
@@ -727,6 +727,47 @@ function Fast.gt(a: buffer, b: buffer): boolean
 	) > 0
 end
 
+function Fast.compare(a: buffer, b: buffer): number
+	return rawCompare(
+		breadi8(a, S), breadf64(a, L), breadf64(a, E),
+		breadi8(b, S), breadf64(b, L), breadf64(b, E)
+	)
+end
+
+function Fast.ne(a: buffer, b: buffer): boolean
+	return not Fast.eq(a, b)
+end
+
+function Fast.lte(a: buffer, b: buffer): boolean
+	return Fast.compare(a, b) <= 0
+end
+
+function Fast.gte(a: buffer, b: buffer): boolean
+	return Fast.compare(a, b) >= 0
+end
+
+function Fast.isZero(value: buffer): boolean
+	return breadi8(value, S) == 0
+end
+
+function Fast.isOne(value: buffer): boolean
+	return breadi8(value, S) == 1
+		and breadf64(value, L) == 0
+		and breadf64(value, E) == 1
+end
+
+function Fast.alloc(): buffer
+	return alloc()
+end
+
+function Fast.zero(): buffer
+	return alloc()
+end
+
+function Fast.one(): buffer
+	return setRaw(alloc(), 1, 0, 1)
+end
+
 function GreaterNum.new(s: number, l: number, e: number): buffer
 	local out = alloc()
 	return normalizeInto(out, s, l, e)
@@ -921,43 +962,49 @@ function GreaterNum.powInto(out: buffer, a, b): buffer
 	return powPartsInto(out, s1,l1,e1,s2,l2,e2)
 end
 
-local function mutateParts(target: buffer, operation: string, other): buffer
-	local s1 = breadi8(target, S)
-	local l1 = breadf64(target, L)
-	local e1 = breadf64(target, E)
-	local s2, l2, e2 = parts(other)
-
-	if operation == "add" then
-		return signedAddPartsInto(target, s1, l1, e1, s2, l2, e2)
-	elseif operation == "sub" then
-		return signedAddPartsInto(target, s1, l1, e1, -s2, l2, e2)
-	elseif operation == "mul" then
-		return mulPartsInto(target, s1, l1, e1, s2, l2, e2)
-	elseif operation == "div" then
-		return divPartsInto(target, s1, l1, e1, s2, l2, e2)
-	end
-
-	return powPartsInto(target, s1, l1, e1, s2, l2, e2)
-end
-
 function GreaterNum.addeq(a: buffer, b): buffer
-	return mutateParts(a, "add", b)
+	local s2,l2,e2 = parts(b)
+	return signedAddPartsInto(
+		a,
+		breadi8(a, S), breadf64(a, L), breadf64(a, E),
+		s2, l2, e2
+	)
 end
 
 function GreaterNum.subeq(a: buffer, b): buffer
-	return mutateParts(a, "sub", b)
+	local s2,l2,e2 = parts(b)
+	return signedAddPartsInto(
+		a,
+		breadi8(a, S), breadf64(a, L), breadf64(a, E),
+		-s2, l2, e2
+	)
 end
 
 function GreaterNum.muleq(a: buffer, b): buffer
-	return mutateParts(a, "mul", b)
+	local s2,l2,e2 = parts(b)
+	return mulPartsInto(
+		a,
+		breadi8(a, S), breadf64(a, L), breadf64(a, E),
+		s2, l2, e2
+	)
 end
 
 function GreaterNum.diveq(a: buffer, b): buffer
-	return mutateParts(a, "div", b)
+	local s2,l2,e2 = parts(b)
+	return divPartsInto(
+		a,
+		breadi8(a, S), breadf64(a, L), breadf64(a, E),
+		s2, l2, e2
+	)
 end
 
 function GreaterNum.poweq(a: buffer, b): buffer
-	return mutateParts(a, "pow", b)
+	local s2,l2,e2 = parts(b)
+	return powPartsInto(
+		a,
+		breadi8(a, S), breadf64(a, L), breadf64(a, E),
+		s2, l2, e2
+	)
 end
 
 function GreaterNum.neg(v): buffer
@@ -1077,16 +1124,55 @@ function GreaterNum.log(a, base): buffer
 end
 
 function GreaterNum.compare(a, b): number
+	if type(a) == "buffer" and type(b) == "buffer" then
+		return Fast.compare(a, b)
+	end
+
 	local s1,l1,e1 = parts(a)
 	local s2,l2,e2 = parts(b)
 	return rawCompare(s1,l1,e1,s2,l2,e2)
 end
 
-function GreaterNum.eq(a,b): boolean return GreaterNum.compare(a,b) == 0 end
-function GreaterNum.lt(a,b): boolean return GreaterNum.compare(a,b) < 0 end
-function GreaterNum.lte(a,b): boolean return GreaterNum.compare(a,b) <= 0 end
-function GreaterNum.gt(a,b): boolean return GreaterNum.compare(a,b) > 0 end
-function GreaterNum.gte(a,b): boolean return GreaterNum.compare(a,b) >= 0 end
+function GreaterNum.eq(a,b): boolean
+	if type(a) == "buffer" and type(b) == "buffer" then
+		return Fast.eq(a, b)
+	end
+	return GreaterNum.compare(a,b) == 0
+end
+
+function GreaterNum.ne(a,b): boolean
+	return not GreaterNum.eq(a,b)
+end
+
+function GreaterNum.lt(a,b): boolean
+	if type(a) == "buffer" and type(b) == "buffer" then
+		return Fast.lt(a, b)
+	end
+	return GreaterNum.compare(a,b) < 0
+end
+
+function GreaterNum.lte(a,b): boolean
+	if type(a) == "buffer" and type(b) == "buffer" then
+		return Fast.lte(a, b)
+	end
+	return GreaterNum.compare(a,b) <= 0
+end
+
+function GreaterNum.gt(a,b): boolean
+	if type(a) == "buffer" and type(b) == "buffer" then
+		return Fast.gt(a, b)
+	end
+	return GreaterNum.compare(a,b) > 0
+end
+
+function GreaterNum.gte(a,b): boolean
+	if type(a) == "buffer" and type(b) == "buffer" then
+		return Fast.gte(a, b)
+	end
+	return GreaterNum.compare(a,b) >= 0
+end
+
+GreaterNum.equals = GreaterNum.eq
 
 function GreaterNum.max(...)
 	local args = table.pack(...)
@@ -1114,12 +1200,18 @@ function GreaterNum.min(...)
 	return GreaterNum.clone(result)
 end
 
+local function absCompare(a, b): number
+	local s1,l1,e1 = parts(a)
+	local s2,l2,e2 = parts(b)
+	return rawCompare(abs(s1), l1, e1, abs(s2), l2, e2)
+end
+
 function GreaterNum.maxabs(...)
 	local args = table.pack(...)
 	local result = args[1]
 
 	for i = 2, args.n do
-		if GreaterNum.gt(GreaterNum.abs(args[i]), GreaterNum.abs(result)) then
+		if absCompare(args[i], result) > 0 then
 			result = args[i]
 		end
 	end
@@ -1132,7 +1224,7 @@ function GreaterNum.minabs(...)
 	local result = args[1]
 
 	for i = 2, args.n do
-		if GreaterNum.lt(GreaterNum.abs(args[i]), GreaterNum.abs(result)) then
+		if absCompare(args[i], result) < 0 then
 			result = args[i]
 		end
 	end
@@ -1333,24 +1425,32 @@ function GreaterNum.clamp(value, low, high): buffer
 	return GreaterNum.clone(value)
 end
 
-function GreaterNum.sum(values: {any}): buffer
-	local result = GreaterNum.zero()
+function GreaterNum.sumInto(out: buffer, values: {any}): buffer
+	setZero(out)
 
 	for i = 1, #values do
-		GreaterNum.addeq(result, values[i])
+		GreaterNum.addeq(out, values[i])
 	end
 
-	return result
+	return out
+end
+
+function GreaterNum.sum(values: {any}): buffer
+	return GreaterNum.sumInto(alloc(), values)
+end
+
+function GreaterNum.productInto(out: buffer, values: {any}): buffer
+	setRaw(out, 1, 0, 1)
+
+	for i = 1, #values do
+		GreaterNum.muleq(out, values[i])
+	end
+
+	return out
 end
 
 function GreaterNum.product(values: {any}): buffer
-	local result = GreaterNum.one()
-
-	for i = 1, #values do
-		GreaterNum.muleq(result, values[i])
-	end
-
-	return result
+	return GreaterNum.productInto(alloc(), values)
 end
 
 function GreaterNum.geometricSum(base, multiplier, startIndex: number, lastIndex: number): buffer
@@ -1841,6 +1941,32 @@ function GreaterNum.tryCoerce(value): (buffer?, string?)
 	return nil, tostring(result)
 end
 
+function GreaterNum.tryToNumber(value): (number?, string?)
+	local ok, n = pcall(GreaterNum.toNumber, value)
+
+	if not ok then
+		return nil, tostring(n)
+	end
+
+	if n ~= n then
+		return nil, "GreaterNum.tryToNumber: value is NaN"
+	end
+
+	if n == math.huge or n == -math.huge then
+		return nil, "GreaterNum.tryToNumber: value exceeds native number range"
+	end
+
+	return n, nil
+end
+
+function GreaterNum.fromTuple(data): buffer
+	if type(data) ~= "table" or #data < 3 then
+		error("GreaterNum.fromTuple: expected {sign, layer, exponent}")
+	end
+
+	return GreaterNum.new(data[1], data[2], data[3])
+end
+
 function GreaterNum.isOne(value): boolean
 	local s,l,e = parts(value)
 	return s == 1 and l == 0 and e == 1
@@ -1963,6 +2089,67 @@ function GreaterNum.clamp01(value): buffer
 	return GreaterNum.clamp(value, 0, 1)
 end
 
+function GreaterNum.inRange(value, low, high, inclusive: boolean?): boolean
+	if GreaterNum.gt(low, high) then
+		low, high = high, low
+	end
+
+	if inclusive == false then
+		return GreaterNum.gt(value, low) and GreaterNum.lt(value, high)
+	end
+
+	return GreaterNum.gte(value, low) and GreaterNum.lte(value, high)
+end
+
+GreaterNum.between = GreaterNum.inRange
+
+function GreaterNum.lerpClamped(a, b, alpha: number): buffer
+	return GreaterNum.lerp(a, b, math.clamp(alpha, 0, 1))
+end
+
+function GreaterNum.moveTowards(current, target, maxDelta): buffer
+	local delta = GreaterNum.sub(target, current)
+	local distance = GreaterNum.abs(delta)
+	local step = GreaterNum.abs(maxDelta)
+
+	if GreaterNum.lte(distance, step) then
+		return GreaterNum.clone(target)
+	end
+
+	return GreaterNum.add(current, GreaterNum.mul(step, GreaterNum.sign(delta)))
+end
+
+function GreaterNum.addPercent(value, amount): buffer
+	return GreaterNum.add(value, GreaterNum.percent(value, amount))
+end
+
+function GreaterNum.subPercent(value, amount): buffer
+	return GreaterNum.sub(value, GreaterNum.percent(value, amount))
+end
+
+function GreaterNum.percentOf(part, total): buffer
+	if GreaterNum.isZero(total) then
+		return GreaterNum.nan()
+	end
+
+	return GreaterNum.mul(GreaterNum.div(part, total), 100)
+end
+
+function GreaterNum.percentChange(oldValue, newValue): buffer
+	if GreaterNum.isZero(oldValue) then
+		return GreaterNum.nan()
+	end
+
+	return GreaterNum.mul(
+		GreaterNum.div(GreaterNum.sub(newValue, oldValue), GreaterNum.abs(oldValue)),
+		100
+	)
+end
+
+function GreaterNum.canAfford(currency, cost): boolean
+	return GreaterNum.gte(currency, cost)
+end
+
 function GreaterNum.inverseLerp(a, b, value): number
 	if GreaterNum.eq(a, b) then
 		return 0
@@ -2005,12 +2192,14 @@ function GreaterNum.weightedMean(values: {any}, weights: {number}): buffer
 	end
 
 	local total = GreaterNum.zero()
+	local term = alloc()
 	local totalWeight = 0
 
 	for i = 1, #values do
 		local weight = weights[i]
 		totalWeight += weight
-		GreaterNum.addeq(total, GreaterNum.mul(values[i], weight))
+		GreaterNum.mulInto(term, values[i], weight)
+		GreaterNum.addeq(total, term)
 	end
 
 	if totalWeight == 0 then
@@ -2040,13 +2229,15 @@ function GreaterNum.harmonicMean(values: {any}): buffer
 	end
 
 	local reciprocalSum = GreaterNum.zero()
+	local reciprocal = alloc()
 
 	for i = 1, #values do
 		if GreaterNum.isZero(values[i]) then
 			return GreaterNum.zero()
 		end
 
-		GreaterNum.addeq(reciprocalSum, GreaterNum.recip(values[i]))
+		GreaterNum.divInto(reciprocal, 1, values[i])
+		GreaterNum.addeq(reciprocalSum, reciprocal)
 	end
 
 	return GreaterNum.div(#values, reciprocalSum)
@@ -2282,7 +2473,11 @@ function GreaterNum.formatRate(value, unit: string?, digits: number?): string
 end
 
 GreaterNum.parse = GreaterNum.fromString
+GreaterNum.fromtuple = GreaterNum.fromTuple
 GreaterNum.roundto = GreaterNum.roundTo
+GreaterNum.lerpclamped = GreaterNum.lerpClamped
+GreaterNum.movetowards = GreaterNum.moveTowards
+GreaterNum.canafford = GreaterNum.canAfford
 GreaterNum.recipeq = function(value: buffer)
 	local result = GreaterNum.recip(value)
 	return GreaterNum.copy(value, result)
@@ -2382,6 +2577,16 @@ function GreaterNum.decode(data: string): buffer
 	return value
 end
 
+function GreaterNum.tryDecode(data: string): (buffer?, string?)
+	local ok, result = pcall(GreaterNum.decode, data)
+
+	if ok then
+		return result, nil
+	end
+
+	return nil, tostring(result)
+end
+
 function GreaterNum.bytes(): number
 	return SIZE
 end
@@ -2425,18 +2630,27 @@ function GreaterNum.benchmark(iterations: number?)
 	end
 
 	return {
+		version = VERSION,
+		iterations = iterations,
+
 		add = run(function() GreaterNum.add(a,b) end),
 		sub = run(function() GreaterNum.sub(a,b) end),
 		mul = run(function() GreaterNum.mul(a,b) end),
 		div = run(function() GreaterNum.div(a,b) end),
 		pow = run(function() GreaterNum.pow(pbase,pexp) end),
 		log = run(function() GreaterNum.log10(a) end),
+		compare = run(function() GreaterNum.compare(a,b) end),
+		addeqNumber = run(function()
+			Fast.copyInto(scratch, a)
+			GreaterNum.addeq(scratch, 1)
+		end),
 
 		fastAdd = run(function() Fast.add(a,b) end),
 		fastSub = run(function() Fast.sub(a,b) end),
 		fastMul = run(function() Fast.mul(a,b) end),
 		fastDiv = run(function() Fast.div(a,b) end),
 		fastPow = run(function() Fast.pow(pbase,pexp) end),
+		fastCompare = run(function() Fast.compare(a,b) end),
 
 		intoAdd = run(function() Fast.addInto(scratch,a,b) end),
 		intoSub = run(function() Fast.subInto(scratch,a,b) end),
