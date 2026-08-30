@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-1.1.0-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-1.2.9-blue">
   <img alt="Luau" src="https://img.shields.io/badge/language-Luau-blueviolet">
   <img alt="Roblox" src="https://img.shields.io/badge/platform-Roblox-00A2FF">
   <img alt="Buffer Size" src="https://img.shields.io/badge/value%20size-17%20bytes-green">
@@ -66,7 +66,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GreaterNum = require(ReplicatedStorage.Packages.GreaterNum)
 ```
 
-GreaterNum v1.1 reports its version and representation directly:
+GreaterNum v1.2.9 reports its version and representation directly:
 
 ```lua
 print(GreaterNum.version())
@@ -77,9 +77,9 @@ print(GreaterNum.REPRESENTATION)
 Expected metadata:
 
 ```text
-1.1.0
+1.2.9
 17
-Sign + Layer + Exponent
+17-byte canonical raw Sign + Layer + Exponent
 ```
 
 ---
@@ -1068,7 +1068,7 @@ Do not rewrite every piece of game logic around `Fast` just because it exists. U
 
 # Benchmark
 
-GreaterNum includes a small built-in microbenchmark:
+GreaterNum includes a built-in microbenchmark for checking hot-path performance in the current Roblox runtime:
 
 ```lua
 local results = GreaterNum.benchmark(100000)
@@ -1081,7 +1081,7 @@ print("Fast Compare", results.fastCompare, "ns/op")
 print("Into Add", results.intoAdd, "ns/op")
 ```
 
-The benchmark currently measures operations including:
+The built-in benchmark currently covers operations including:
 
 ```text
 add
@@ -1106,7 +1106,118 @@ intoPow
 scratchPow
 ```
 
-Benchmark results depend on device, Studio/runtime conditions, iteration count, and what else Roblox is doing. Use the benchmark for relative testing on the same environment rather than treating one number as a universal result.
+## Measured v1.2.9 public API speed
+
+The table below is from a paired Roblox Studio RTT benchmark of **GreaterNum v1.2.9** against **GammaNum v1.1.2**.
+
+- Lower `ns/op` is better.
+- Higher `ops/sec` is better.
+- The values are representative benchmark cases, not guaranteed universal timings.
+- Runtime, hardware, Studio load, thermal state, and iteration count can change the exact result.
+- Use these numbers primarily to compare relative hot-path cost.
+
+| Category | Function / case | GreaterNum | Ops/sec | vs GammaNum |
+| --- | --- | ---: | ---: | ---: |
+| Construction | `new` small | **49.347 ns** | **20.26M/s** | **1.105x faster** |
+| Construction | `new` layer-1 | **49.367 ns** | **20.26M/s** | **1.207x faster** |
+| Construction | `fromNumber` small | **47.243 ns** | **21.17M/s** | **1.102x faster** |
+| Construction | `fromNumber` `1e250` | **54.974 ns** | **18.19M/s** | **1.142x faster** |
+| Construction | `fromScientific` | **60.222 ns** | **16.61M/s** | **1.553x faster** |
+| Construction | `fromString` decimal | **177.142 ns** | **5.65M/s** | **3.292x faster** |
+| Construction | `fromString` scientific | **221.833 ns** | **4.51M/s** | **3.030x faster** |
+| Conversion | `tuple` | 18.829 ns | 53.11M/s | GammaNum 1.216x faster |
+| Conversion | `clone` | **76.779 ns** | **13.02M/s** | **1.425x faster** |
+| Conversion | `toNumber` small | **18.433 ns** | **54.25M/s** | **2.617x faster** |
+| Conversion | `toNumber` layer-1 | **18.651 ns** | **53.62M/s** | **4.840x faster** |
+| Comparison | `eq` | **19.870 ns** | **50.33M/s** | **3.483x faster** |
+| Comparison | `lt` | **19.837 ns** | **50.41M/s** | **3.440x faster** |
+| Comparison | `compare` | **22.365 ns** | **44.71M/s** | **3.023x faster** |
+| Arithmetic | `add` small | **55.997 ns** | **17.86M/s** | **1.061x faster** |
+| Arithmetic | `sub` small | **55.883 ns** | **17.89M/s** | **1.098x faster** |
+| Arithmetic | `mul` small | **52.099 ns** | **19.19M/s** | **1.099x faster** |
+| Arithmetic | `div` small | **57.325 ns** | **17.44M/s** | **1.014x faster** |
+| Arithmetic | `mod` integer | **77.454 ns** | **12.91M/s** | **1.440x faster** |
+| Arithmetic | `pow` small | **99.290 ns** | **10.07M/s** | **1.527x faster** |
+| Arithmetic | `sqrt` small | **69.013 ns** | **14.49M/s** | **1.552x faster** |
+| Arithmetic | `log10` small | **58.066 ns** | **17.22M/s** | **1.008x faster** |
+| Large math | `add` layer-1 | **53.545 ns** | **18.68M/s** | **1.109x faster** |
+| Large math | `mul` layer-1 | **58.510 ns** | **17.09M/s** | **1.038x faster** |
+| Large math | `div` layer-1 | **65.210 ns** | **15.34M/s** | **1.012x faster** |
+| Large math | `add` layer-2 | **53.416 ns** | **18.72M/s** | **1.084x faster** |
+| Large math | `mul` layer-2 | **54.258 ns** | **18.43M/s** | **1.237x faster** |
+| Large math | `log10` layer-2 | **49.419 ns** | **20.24M/s** | **1.061x faster** |
+| In-place | `addeq` small | **24.079 ns** | **41.53M/s** | **1.182x faster** |
+| In-place | `muleq` small | **23.640 ns** | **42.30M/s** | **1.073x faster** |
+| In-place | `diveq` small | **22.354 ns** | **44.74M/s** | **1.209x faster** |
+| In-place | `poweq` small | **129.955 ns** | **7.69M/s** | **1.609x faster** |
+| Tetration | `tetr(2, 2)` | **62.207 ns** | **16.08M/s** | **2.267x faster** |
+| Tetration | `tetr(2, 3)` | **62.522 ns** | **15.99M/s** | **3.063x faster** |
+| Tetration | `tetr(2, 4)` | **62.621 ns** | **15.97M/s** | **3.828x faster** |
+| Tetration | `tetr(10, 5)` | **62.410 ns** | **16.02M/s** | **2.405x faster** |
+| Formatting | `toSuffix` | **250.134 ns** | **4.00M/s** | **2.782x faster** |
+| Formatting | `toScientific` | **518.290 ns** | **1.93M/s** | **1.450x faster** |
+| Formatting | `toEngineer` | **507.243 ns** | **1.97M/s** | **1.551x faster** |
+| Formatting | `toLayered` | **479.436 ns** | **2.09M/s** | **1.427x faster** |
+| Formatting | default string | **243.607 ns** | **4.10M/s** | **2.424x faster** |
+
+### Fastest measured public operations
+
+Some of the lowest-cost public operations in the current benchmark are:
+
+```text
+toNumber small       18.433 ns   54.25M ops/s
+tuple                18.829 ns   53.11M ops/s
+lt                   19.837 ns   50.41M ops/s
+eq                   19.870 ns   50.33M ops/s
+compare              22.365 ns   44.71M ops/s
+diveq                22.354 ns   44.74M ops/s
+muleq                23.640 ns   42.30M ops/s
+addeq                24.079 ns   41.53M ops/s
+fromNumber           47.243 ns   21.17M ops/s
+new                  49.347 ns   20.26M ops/s
+```
+
+### String parser speed
+
+`fromString` received major optimization work in the v1.2.x series.
+
+Current representative results:
+
+```text
+Decimal string:
+177.142 ns/op
+5.65M parses/sec
+3.292x faster than GammaNum 1.1.2
+
+Scientific string:
+221.833 ns/op
+4.51M parses/sec
+3.030x faster than GammaNum 1.1.2
+```
+
+The parser uses direct buffer writes and optimized numeric/scientific paths while preserving GreaterNum's extended string formats such as:
+
+```text
+1e250
+3.14159e250
+L1:250
+2;500
+Infinity
+NaN
+```
+
+### Reading benchmark results
+
+A timing difference of only a few percent can be normal run-to-run noise. Larger repeated differences are more meaningful.
+
+For reliable comparisons:
+
+1. Benchmark both versions in the same Roblox Studio session when possible.
+2. Use the same inputs and iteration count.
+3. Warm up the functions before recording results.
+4. Run several rounds and compare medians.
+5. Avoid treating a single sub-nanosecond difference as a guaranteed optimization.
+
 
 ---
 
@@ -1243,42 +1354,54 @@ Operations such as division by zero, invalid roots/powers, or invalid mathematic
 
 ---
 
-# v1.1 QoL Update
+# v1.2.9 Performance Update
 
-v1.1 is intentionally a compatibility-focused update. The underlying 17-byte representation remains unchanged.
+v1.2.9 keeps the same **17-byte Sign + Layer + Exponent representation** while focusing heavily on public API hot-path speed.
 
-Highlights include:
+Highlights:
 
-- `Fast.compare`
-- `Fast.ne`
-- `Fast.lte`
-- `Fast.gte`
-- `Fast.isZero`
-- `Fast.isOne`
-- `Fast.alloc`
-- `Fast.zero`
-- `Fast.one`
-- `GreaterNum.ne`
-- `GreaterNum.equals`
-- `GreaterNum.sumInto`
-- `GreaterNum.productInto`
-- `GreaterNum.inRange` / `between`
-- `GreaterNum.lerpClamped`
-- `GreaterNum.moveTowards`
-- `GreaterNum.addPercent`
-- `GreaterNum.subPercent`
-- `GreaterNum.percentOf`
-- `GreaterNum.percentChange`
-- `GreaterNum.canAfford`
-- `GreaterNum.fromTuple`
-- `GreaterNum.tryToNumber`
-- `GreaterNum.tryDecode`
-- Lower-overhead mutating arithmetic dispatch
-- Lower-allocation absolute comparisons
-- Scratch-buffer reuse in selected aggregation helpers
-- Expanded benchmark coverage
+- Faster `new`
+- Faster `fromNumber`
+- Direct `fromScientific` construction paths
+- Rebuilt `fromString` parser
+- Native-first decimal parsing
+- Optimized scientific parsing with overflow/underflow fallback
+- Direct 17-byte buffer writes
+- Lower-overhead `eq`, `lt`, `gt`, `compare`, `lte`, and `gte`
+- Faster `toNumber`
+- Faster layered arithmetic hot paths
+- Optimized in-place arithmetic
+- Optimized integer tetration
+- Fast buffer-only `Fast` API
+- Reusable output-buffer `*Into` APIs
+- Same 17-byte compatible buffer representation
+- Existing public API remains available
 
-Existing v1.0-style APIs remain available, making v1.1 suitable as a drop-in update for code that already uses GreaterNum's public API.
+Representative v1.2.9 results from the current Roblox Studio benchmark include:
+
+```text
+fromNumber small        47.243 ns
+fromScientific          60.222 ns
+fromString decimal     177.142 ns
+fromString scientific  221.833 ns
+
+eq                       19.870 ns
+lt                       19.837 ns
+compare                  22.365 ns
+
+add small                55.997 ns
+mul small                52.099 ns
+div small                57.325 ns
+
+addeq                    24.079 ns
+muleq                    23.640 ns
+diveq                    22.354 ns
+
+tetr(2, 4)               62.621 ns
+```
+
+v1.2.9 is intended as a drop-in performance-focused update for existing GreaterNum users that already rely on the current buffer format and API.
+
 
 ---
 
@@ -1444,7 +1567,7 @@ GreaterNum.version()
 Current version:
 
 ```text
-1.1
+1.2.9
 ```
 
 Buffer size:
