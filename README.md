@@ -1,12 +1,23 @@
 # GreaterNum
 
+## v1.2.10 — safe serialized record ingestion
+
+The existing binary representation is exactly **17 bytes**: a signed-byte sign and two IEEE-754 64-bit fields. `GreaterNum.decode(text)` and `GreaterNum.deserializeBuffer(buffer)` now validate the complete decoded record with `GreaterNum.isValid` before allowing untrusted data into math operations.
+
+Malformed sign bytes, NaN components, invalid lengths and invalid zero-state records are rejected rather than passing through as internal buffers. Well-formed serialized values and public arithmetic remain byte-compatible. This deliberately adds validation to **ingress only**, not every arithmetic hot path.
+
+Run `tests/GreaterNumBinaryRegression.server.lua` in Studio to check valid numbers and corrupted sign/size values. No arithmetic speed gain is claimed; the source still needs a full Script Analysis run before a strict-typecheck claim.
+
+---
+
+
 <p align="center">
   <strong>A fast layered-number library for Roblox/Luau.</strong><br>
   Built for clicker games, simulators, incremental economies, prestige systems, and any project that needs numbers far beyond normal Lua limits.
 </p>
 
 <p align="center">
-  <img alt="Version" src="https://img.shields.io/badge/version-1.2.9-blue">
+  <img alt="Version" src="https://img.shields.io/badge/version-1.2.10-blue">
   <img alt="Luau" src="https://img.shields.io/badge/language-Luau-blueviolet">
   <img alt="Roblox" src="https://img.shields.io/badge/platform-Roblox-00A2FF">
   <img alt="Buffer Size" src="https://img.shields.io/badge/value%20size-17%20bytes-green">
@@ -66,7 +77,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local GreaterNum = require(ReplicatedStorage.Packages.GreaterNum)
 ```
 
-GreaterNum v1.2.9 reports its version and representation directly:
+GreaterNum v1.2.10 reports its version and representation directly:
 
 ```lua
 print(GreaterNum.version())
@@ -77,7 +88,7 @@ print(GreaterNum.REPRESENTATION)
 Expected metadata:
 
 ```text
-1.2.9
+1.2.10
 17
 17-byte canonical raw Sign + Layer + Exponent
 ```
@@ -1106,9 +1117,9 @@ intoPow
 scratchPow
 ```
 
-## Measured v1.2.9 public API speed
+## Measured v1.2.10 public API speed
 
-The table below is from a paired Roblox Studio RTT benchmark of **GreaterNum v1.2.9** against **GammaNum v1.1.2**.
+The table below is from a paired Roblox Studio RTT benchmark of **GreaterNum v1.2.10** against **GammaNum v1.1.2**.
 
 - Lower `ns/op` is better.
 - Higher `ops/sec` is better.
@@ -1354,9 +1365,9 @@ Operations such as division by zero, invalid roots/powers, or invalid mathematic
 
 ---
 
-# v1.2.9 Performance Update
+# v1.2.10 Performance Update
 
-v1.2.9 keeps the same **17-byte Sign + Layer + Exponent representation** while focusing heavily on public API hot-path speed.
+v1.2.10 keeps the same **17-byte Sign + Layer + Exponent representation** while focusing heavily on public API hot-path speed.
 
 Highlights:
 
@@ -1377,7 +1388,7 @@ Highlights:
 - Same 17-byte compatible buffer representation
 - Existing public API remains available
 
-Representative v1.2.9 results from the current Roblox Studio benchmark include:
+Representative v1.2.10 results from the current Roblox Studio benchmark include:
 
 ```text
 fromNumber small        47.243 ns
@@ -1400,7 +1411,7 @@ diveq                    22.354 ns
 tetr(2, 4)               62.621 ns
 ```
 
-v1.2.9 is intended as a drop-in performance-focused update for existing GreaterNum users that already rely on the current buffer format and API.
+v1.2.10 is intended as a drop-in performance-focused update for existing GreaterNum users that already rely on the current buffer format and API.
 
 
 ---
@@ -1567,7 +1578,7 @@ GreaterNum.version()
 Current version:
 
 ```text
-1.2.9
+1.2.10
 ```
 
 Buffer size:
