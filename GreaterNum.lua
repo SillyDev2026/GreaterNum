@@ -6,7 +6,7 @@ local GreaterNum = {}
 local Fast = {}
 GreaterNum.Fast = Fast
 
-local VERSION = "1.2.9"
+local VERSION = "1.2.10"
 local SIZE = 17
 
 local S = 0
@@ -5553,11 +5553,10 @@ function GreaterNum.serializeBuffer(value): buffer
 end
 
 function GreaterNum.deserializeBuffer(data: buffer): buffer
-	if type(data) ~= "buffer" or blen(data) ~= SIZE then
-		error("GreaterNum.deserializeBuffer: expected 17-byte buffer")
-	end
-
-	return GreaterNum.clone(data)
+    if not GreaterNum.isValid(data) then
+        error("GreaterNum.deserializeBuffer: invalid 17-byte GreaterNum record")
+    end
+    return GreaterNum.clone(data)
 end
 
 function GreaterNum.encode(value): string
@@ -5571,11 +5570,10 @@ function GreaterNum.decode(data: string): buffer
 
 	local value = buffer.fromstring(data)
 
-	if blen(value) ~= SIZE then
-		error("GreaterNum.decode: invalid encoded GreaterNum size")
-	end
-
-	return value
+    if not GreaterNum.isValid(value) then
+        error("GreaterNum.decode: invalid GreaterNum encoded record")
+    end
+    return value
 end
 
 function GreaterNum.tryDecode(data: string): (buffer?, string?)
